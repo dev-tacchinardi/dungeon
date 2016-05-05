@@ -1,0 +1,59 @@
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+#:import path os.path
+#:import dirname os.path.dirname
+#:import main __main__
+
+Dungeon:
+    
+<Dungeon>:
+    gameworld: gameworld
+    app: app
+    GameWorld:
+        id: gameworld
+        gamescreenmanager: gamescreenmanager
+        size_of_gameworld: 100*1024
+        zones: {'general': 10000, 'touch': 100}
+        PositionSystem2D:
+            system_id: 'position'
+            gameworld: gameworld
+            zones: ['general', 'touch']
+        RotateSystem2D:
+            system_id: 'rotate'
+            gameworld: gameworld
+            zones: ['general']
+        RotateRenderer:
+            gameworld: gameworld
+            zones: ['general']
+            shader_source: path.join(dirname(path.abspath(main.__file__)), 'assets', 'positionrotateshader.glsl')
+            gameview: 'camera1'
+        CymunkPhysics:
+            gameworld: root.gameworld
+            zones: ['general']
+        # CymunkTouchSystem:
+        #     gameworld: root.gameworld
+        #     zones: ['touch']
+        #     zone_to_use: 'touch'
+        #     physics_system: 'cymunk_physics'
+        #     touch_radius: 30
+        #     gameview: 'camera1'
+        GameView:
+            system_id: 'camera1'
+            gameworld: gameworld
+            size: root.size
+            pos: root.pos
+            do_scroll_lock: False
+            updateable: True
+    GameScreenManager:
+        id: gamescreenmanager
+        size: root.size
+        pos: root.pos
+        gameworld: gameworld
+
+<GameScreenManager>:
+    MainScreen:
+        id: main_screen
+
+<MainScreen@GameScreen>:
+    name: 'main'
+
+

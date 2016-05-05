@@ -1,0 +1,5 @@
+cython
+kivy
+git+https://github.com/tito/cymunk.git
+--index-url https://github.com/kivy/kivent/tree/master/modules/core kivent_core
+--index-url https://github.com/kivy/kivent/tree/master/modules/cymunk kivent_cymunk
