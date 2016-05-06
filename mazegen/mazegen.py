@@ -1,4 +1,5 @@
 import time
+import sys
 from PIL import Image
 
 from celltype import EmptyCell
@@ -6,7 +7,12 @@ from maze import Maze
 
 
 if __name__ == '__main__':
-    maze = Maze(51, 51)
+    width, height = 75, 75
+    if len(sys.argv) >= 3:
+        width = int(sys.argv[1])
+        height = int(sys.argv[2])
+
+    maze = Maze(width, height)
     t1 = time.clock()
     while not maze.generate():
         t2 = time.clock()
