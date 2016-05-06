@@ -19,7 +19,17 @@ class Cell:
     def is_carveable(self):
         return (
             self.cell_type == EmptyCell and
+            not self.is_edge() and
             len(self.neighbors(cell_type=EmptyCell)) >= 3
+        )
+
+    def is_edge(self):
+        # len(self.neighbors()) != 4  de olabilir
+        return (
+            self.x == 0 or
+            self.x == self.maze.width - 1 or
+            self.y == 0 or
+            self.y == self.maze.height - 1
         )
 
     def neighbors(self, carveable=False, cell_type=None):

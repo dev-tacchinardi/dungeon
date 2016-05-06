@@ -9,7 +9,7 @@ from room import Room
 class Maze:
     ROOM_TRIES = 300
     DISCARD_ADJACENT_CHANCE = 10
-    RANDOM_CONNECTOR_CHANCE = 50
+    RANDOM_CONNECTOR_CHANCE = 200
 
     _regions = []  # will only be used for generation
     _rooms = []
@@ -181,10 +181,6 @@ class Maze:
                 for c in other_region.cells:
                     if c not in region.cells:
                         region += c
-            elif random.randrange(50) == 0:
-                carved = self._carve(cell=cell, force=True)
-                region += carved
-
 
         for cell in region.around():
             if random.randrange(Maze.RANDOM_CONNECTOR_CHANCE) == 0:
@@ -193,6 +189,10 @@ class Maze:
 
     def _clean(self):
         print("Clearing map of dead ends...")
+        for cell in self.cells():
+            if cell.cell_type != EmptyCell and cell.is_edge():
+                self._uncarve(cell=cell)
+
         while True:
             done = True
             for cell in self.cells():
