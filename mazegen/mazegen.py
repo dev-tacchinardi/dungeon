@@ -28,16 +28,16 @@ if __name__ == '__main__':
         row = []
         for x in range(maze.width):
             if x == 0 and y == 0:
-                value = 128
+                value = (255, 0, 0)
             elif maze[x][y].cell_type == EmptyCell:
-                value = 0
+                value = (0, 0, 0)
             else:
-                value = 255
-            row.extend([value] * image_size)
+                value = (255, 255, 255)
+            row.extend([value[0]] * image_size + [value[1]] * image_size + [value[2]] * image_size)
         pixels.extend(row * image_size)
 
     image = Image.frombytes(
-        'L', (maze.width * image_size, maze.height * image_size),
+        'RGB', (maze.width * image_size, maze.height * image_size),
         bytes([p for p in pixels])
     )
     image.show()

@@ -1,15 +1,16 @@
 import random
 
-from cell import Cell
-from celltype import EmptyCell, FloorCell
-from region import Region
-from room import Room
+from dungeon_generator.cell import Cell
+from dungeon_generator.celltype import EmptyCell, FloorCell
+from dungeon_generator.region import Region
+from dungeon_generator.room import Room
 
 
 class Maze:
-    ROOM_TRIES = 300
+    ROOM_TRIES = 500
     DISCARD_ADJACENT_CHANCE = 10
-    RANDOM_CONNECTOR_CHANCE = 200
+    RANDOM_CONNECTOR_CHANCE = 100
+    WINDING_PERCENT = 20
 
     _regions = []  # will only be used for generation
     _rooms = []
@@ -26,6 +27,8 @@ class Maze:
              for y in range(height)]
             for x in range(width)
         ]
+        self.RANDOM_CONNECTOR_CHANCE = int(width * height / 10)
+        self.connection_root = None
 
     def __str__(self):
         ret = '='.join(['' for _ in range(0, self.width + 5)]) + '\n'
@@ -92,7 +95,7 @@ class Maze:
 
             new_room = Room(pos_x, pos_y, width, height)
             for room in self._rooms:
-                if new_room.overlaps(room) or new_room.is_adjacent_to(room=room):
+                if new_room.overlaps(room):  # or new_room.is_adjacent_to(room=room):
                     break
             else:
                 self._rooms.append(new_room)
@@ -109,82 +112,107 @@ class Maze:
         return True
 
     def _flood(self):
-        def find_origin():
-            for c in self.cells():
-                if c.cell_type != EmptyCell:
-                    continue
-                if len(c.neighbors(cell_type=EmptyCell)) == 4:
-                    return c
-            return None
-
         print("Generating corridors...")
-        while True:
-            origin = find_origin()
-            if not origin:
-                break
-            region = Region()
-            region += self._carve(cell=origin)
+        for x in range(self.width):
+            for y in range(self.height):
+                origin = self.grid[x][y]
+                if origin.cell_type != EmptyCell or not origin.is_carveable():
+                    continue
 
-            valid_cells = [origin]
-            while len(valid_cells) != 0:
-                cell = random.choice(valid_cells)
-                carveable_neighbors = cell.neighbors(carveable=True)
-                if carveable_neighbors:
-                    to_carve = random.choice(carveable_neighbors)
+                region = Region()
+                region += self._carve(cell=origin)
+
+                valid_cells = [origin]
+                while len(valid_cells) != 0:
+                    # always pick the last carved cell
+                    # cell = valid_cells[-1]
+                    # OR
+                    # pick at random
+                    cell = random.choice(valid_cells)
+                    # OR
+                    # pick at random, weighted towards latest
+                    # todo
+
+                    to_carve = None
+
+                    # try to move right ahead (1 - Maze.WINDING_PERCENT) of the time
+                    if random.randrange(100) > Maze.WINDING_PERCENT:
+                        if len(valid_cells) > 2 and len(cell.neighbors(carveable=True)) == 1:
+                            prev = cell.neighbors(carveable=True)[0]
+                            prev_dir = prev.direction_towards(cell)
+                            to_carve = getattr(cell, prev_dir)(carveable=True)
+
+                    if not to_carve:
+                        carveable_neighbors = cell.neighbors(carveable=True)
+                        if carveable_neighbors:
+                            to_carve = random.choice(carveable_neighbors)
+                        else:
+                            valid_cells.remove(cell)
+                            continue
+
                     carved_cell = self._carve(cell=to_carve)
-
                     region += carved_cell
                     self._corridors.append(carved_cell)
                     valid_cells.append(carved_cell)
-                else:
-                    valid_cells.remove(cell)
-            self._regions.append(region)
+                self._regions.append(region)
         print("{} corridor tiles carved.".format(len(self._corridors)))
         return True
 
     def _connect(self):
         def finished():
             for i in range(1, len(self._rooms)):
-                if str(i).zfill(2) not in regions_merged:
+                if i not in regions_merged:
                     return False
             return True
 
         regions_merged = set()
 
-        room = random.choice(self._rooms)
+        self.connection_root = random.choice(self._rooms)
         region = self._get_region_of_cell(
-            self.grid[room.pos_x][room.pos_y]
+            self.grid[self.connection_root.pos_x][self.connection_root.pos_y]
         )
-        regions_merged.add(str(region.id).zfill(2))
+        regions_merged.add(region.id)
 
         print("{} regions to connect.".format(len(self._regions)))
         print("Starting with region {}...".format(region.id))
 
         while not finished():
             around = region.around(connecting=True)
-            cell = random.choice(around)
 
-            connected_cell_neighbors = cell.neighbors(cell_type=FloorCell)
-            connected_cell = connected_cell_neighbors[0]
-            if connected_cell in region.cells:
-                connected_cell = connected_cell_neighbors[1]
-            other_region = self._get_region_of_cell(connected_cell)
+            while True:
+                cell = random.choice(around)
 
-            if other_region != region:
-                carved = self._carve(cell=cell, force=True)
-                region += carved
-                regions_merged.add(str(other_region.id).zfill(2))
-                print("Region {} merged.\t\tMerged regions: [{}]".format(
-                    other_region.id,
-                    ', '.join(sorted(list(regions_merged)))
-                ))
-                for c in other_region.cells:
-                    if c not in region.cells:
-                        region += c
+                connected_cell_neighbors = cell.neighbors(cell_type=FloorCell)
+                connected_cell = connected_cell_neighbors[0]
+                if connected_cell in region.cells:
+                    connected_cell = connected_cell_neighbors[1]
+                other_region = self._get_region_of_cell(connected_cell)
 
+                if other_region.id in regions_merged:
+                    around.remove(cell)
+                else:
+                    carved = self._carve(cell=cell, force=True)
+                    region += carved
+                    regions_merged.add(other_region.id)
+                    print("Region {} merged.\t\tMerged rooms: {}/{}".format(
+                        str(other_region.id).zfill(3),
+                        len([i for i in regions_merged if i <= len(self._rooms)]),
+                        len(self._rooms)
+                    ), end='\r')
+                    for c in other_region.cells:
+                        if c not in region.cells:
+                            region += c
+                            other_region -= c
+                    break
+
+        skip = False
         for cell in region.around():
-            if random.randrange(Maze.RANDOM_CONNECTOR_CHANCE) == 0:
+            if skip:
+                skip = False
+                continue
+            if random.randrange(self.RANDOM_CONNECTOR_CHANCE) == 0:
                 self._carve(cell=cell, force=True)
+                skip = True
         return True
 
     def _clean(self):
